@@ -10,10 +10,6 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -21,41 +17,50 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Fix all asset paths for GitHub Pages
+      - name: Universal path fixing
         run: |
-          # Copy src to a temporary directory
           cp -r src temp_build
           
-          # Fix ALL absolute paths in HTML files
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="/_next/|href="/typingmind/src/_next/|g' {} \;
-          find temp_build -name "*.html" -type f -exec sed -i 's|src="/_next/|src="/typingmind/src/_next/|g' {} \;
+          # Python script for comprehensive path fixing
+          cat > fix_paths.py << 'EOF'
+          import re
           
-          # Fix favicon and icon paths
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="/favicon|href="/typingmind/src/favicon|g' {} \;
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="/android-icon|href="/typingmind/src/android-icon|g' {} \;
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="/apple-icon|href="/typingmind/src/apple-icon|g' {} \;
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="/ms-icon|href="/typingmind/src/ms-icon|g' {} \;
+          def fix_html_paths(content):
+              # Add base tag if not present
+              if '<base' not in content:
+                  content = content.replace('<head>', '<head><base href="/typingmind/src/">')
+              else:
+                  # Replace existing base tag
+                  content = re.sub(r'<base[^>]*>', '<base href="/typingmind/src/">', content)
+              
+              # Convert ALL absolute paths (except external URLs) to relative paths
+              # This regex matches href="/something" but not href="http://something"
+              content = re.sub(r'(href|src|content)="(/(?!https?://)[^"]*)"', r'\1="\2"', content)
+              
+              # Remove leading slash from paths to make them relative
+              content = re.sub(r'(href|src|content)="(/[^h][^"]*)"', r'\1="\2"', content)
+              content = content.replace('href="/', 'href="')
+              content = content.replace('src="/', 'src="')
+              content = content.replace('content="/', 'content="')
+              
+              return content
           
-          # Fix manifest and other root files
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="/manifest.json"|href="/typingmind/src/manifest.json"|g' {} \;
-          find temp_build -name "*.html" -type f -exec sed -i 's|content="/ms-icon|content="/typingmind/src/ms-icon|g' {} \;
+          # Read and fix the HTML
+          with open('temp_build/index.html', 'r', encoding='utf-8') as f:
+              html_content = f.read()
           
-          # Fix splash screen paths
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="splash_screens/|href="/typingmind/src/splash_screens/|g' {} \;
+          fixed_content = fix_html_paths(html_content)
           
-          # Fix any remaining asset paths
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="/assets/|href="/typingmind/src/assets/|g' {} \;
-          find temp_build -name "*.html" -type f -exec sed -i 's|src="/assets/|src="/typingmind/src/assets/|g' {} \;
+          with open('temp_build/index.html', 'w', encoding='utf-8') as f:
+              f.write(fixed_content)
           
-          # Fix any other root-relative paths (be careful not to break external URLs)
-          find temp_build -name "*.html" -type f -exec sed -i 's|href="/\([^h][^t][^t][^p]\)|href="/typingmind/src/\1|g' {} \;
-          find temp_build -name "*.html" -type f -exec sed -i 's|src="/\([^h][^t][^t][^p]\)|src="/typingmind/src/\1|g' {} \;
+          print("Fixed all paths to be relative with proper base URL")
+          EOF
           
-          echo "=== DEBUGGING: Showing first 50 lines of modified HTML ==="
-          head -50 temp_build/index.html
+          python3 fix_paths.py
           
-          echo "=== DEBUGGING: Checking for remaining absolute paths ==="
-          grep -n 'href="/_next\|src="/_next\|href="/favicon\|href="/manifest' temp_build/index.html || echo "No remaining problematic paths found"
+          echo "=== DEBUGGING: First 30 lines of fixed HTML ==="
+          head -30 temp_build/index.html
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
