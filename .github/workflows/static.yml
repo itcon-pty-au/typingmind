@@ -26,7 +26,7 @@ jobs:
 
           # Blanket replacement: Convert all absolute paths to relative paths with src/ prefix
           # This handles _next/, favicon, manifest, icons, assets, and any other absolute paths
-          sed -i -E 's|(src|href|content)="(/[^"]*)"|\1="src\2"|g' deploy_root/index.html
+          sed -i 's/\(src\|href\|content\)="\(\/[^"]*\)"/\1="src\2"/g' deploy_root/index.html
 
           echo "=== DIRECTORY STRUCTURE ==="
           find deploy_root -type f | head -20
