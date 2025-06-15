@@ -28,10 +28,10 @@ jobs:
           def fix_html_paths(content):
               # Add base tag if not present
               if '<base' not in content:
-                  content = content.replace('<head>', '<head><base href="/typingmind/src/">')
+                  content = content.replace('<head>', '<head><base href="/src/">')
               else:
                   # Replace existing base tag
-                  content = re.sub(r'<base[^>]*>', '<base href="/typingmind/src/">', content)
+                  content = re.sub(r'<base[^>]*>', '<base href="/src/">', content)
               
               # Convert ALL absolute paths (except external URLs) to relative paths
               # This regex matches href="/something" but not href="http://something"
