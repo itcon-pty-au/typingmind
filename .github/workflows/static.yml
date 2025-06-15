@@ -21,47 +21,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Detect package manager
-        id: detect-package-manager
-        run: |
-          if [ -f "${{ github.workspace }}/yarn.lock" ]; then
-            echo "manager=yarn" >> $GITHUB_OUTPUT
-            echo "command=install" >> $GITHUB_OUTPUT
-            echo "runner=yarn" >> $GITHUB_OUTPUT
-          elif [ -f "${{ github.workspace }}/package.json" ]; then
-            echo "manager=npm" >> $GITHUB_OUTPUT
-            echo "command=install" >> $GITHUB_OUTPUT
-            echo "runner=npx --no-install" >> $GITHUB_OUTPUT
-          else
-            echo "Unable to determine package manager"
-            exit 1
-          fi
-      
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: ${{ steps.detect-package-manager.outputs.manager }}
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-        with:
-          static_site_generator: next
-      
-      - name: Restore cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}-
+          cache: 'npm'
       
       - name: Install dependencies
         run: npm install
       
+      - name: List available scripts
+        run: npm run
+      
+      - name: Add Next.js config for static export
+        run: |
+          cat > next.config.js << 'EOF'
+          /** @type {import('next').NextConfig} */
+          const nextConfig = {
+            output: 'export',
+            trailingSlash: true,
+            images: {
+              unoptimized: true
+            },
+            assetPrefix: process.env.NODE_ENV === 'production' ? '/typingmind' : '',
+            basePath: process.env.NODE_ENV === 'production' ? '/typingmind' : ''
+          }
+          module.exports = nextConfig
+          EOF
+      
       - name: Build with Next.js
-        run: npm run build
+        run: |
+          if npm run | grep -q "build"; then
+            npm run build
+          elif npm run | grep -q "export"; then
+            npm run export
+          elif npm run | grep -q "static"; then
+            npm run static
+          else
+            npx next build
+          fi
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
