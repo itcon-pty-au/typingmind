@@ -10,6 +10,10 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,16 +21,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Add base tag to HTML
+      - name: Fix all asset paths for GitHub Pages
         run: |
+          # Copy src to a temporary directory
           cp -r src temp_build
           
-          # Add base tag after <head> to fix all relative paths
-          sed -i 's|<head>|<head><base href="/typingmind/src/">|g' temp_build/index.html
+          # Fix ALL absolute paths in HTML files
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="/_next/|href="/typingmind/src/_next/|g' {} \;
+          find temp_build -name "*.html" -type f -exec sed -i 's|src="/_next/|src="/typingmind/src/_next/|g' {} \;
           
-          echo "Added base tag to HTML"
-          echo "First 30 lines of modified HTML:"
-          head -30 temp_build/index.html
+          # Fix favicon and icon paths
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="/favicon|href="/typingmind/src/favicon|g' {} \;
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="/android-icon|href="/typingmind/src/android-icon|g' {} \;
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="/apple-icon|href="/typingmind/src/apple-icon|g' {} \;
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="/ms-icon|href="/typingmind/src/ms-icon|g' {} \;
+          
+          # Fix manifest and other root files
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="/manifest.json"|href="/typingmind/src/manifest.json"|g' {} \;
+          find temp_build -name "*.html" -type f -exec sed -i 's|content="/ms-icon|content="/typingmind/src/ms-icon|g' {} \;
+          
+          # Fix splash screen paths
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="splash_screens/|href="/typingmind/src/splash_screens/|g' {} \;
+          
+          # Fix any remaining asset paths
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="/assets/|href="/typingmind/src/assets/|g' {} \;
+          find temp_build -name "*.html" -type f -exec sed -i 's|src="/assets/|src="/typingmind/src/assets/|g' {} \;
+          
+          # Fix any other root-relative paths (be careful not to break external URLs)
+          find temp_build -name "*.html" -type f -exec sed -i 's|href="/\([^h][^t][^t][^p]\)|href="/typingmind/src/\1|g' {} \;
+          find temp_build -name "*.html" -type f -exec sed -i 's|src="/\([^h][^t][^t][^p]\)|src="/typingmind/src/\1|g' {} \;
+          
+          echo "=== DEBUGGING: Showing first 50 lines of modified HTML ==="
+          head -50 temp_build/index.html
+          
+          echo "=== DEBUGGING: Checking for remaining absolute paths ==="
+          grep -n 'href="/_next\|src="/_next\|href="/favicon\|href="/manifest' temp_build/index.html || echo "No remaining problematic paths found"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
