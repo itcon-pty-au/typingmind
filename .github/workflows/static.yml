@@ -10,10 +10,6 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -21,12 +17,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Check repository structure
+      - name: Add base tag to HTML
         run: |
-          echo "Repository root contents:"
-          ls -la
-          echo "Source folder contents:"
-          ls -la src/
+          cp -r src temp_build
+          
+          # Add base tag after <head> to fix all relative paths
+          sed -i 's|<head>|<head><base href="/typingmind/src/">|g' temp_build/index.html
+          
+          echo "Added base tag to HTML"
+          echo "First 30 lines of modified HTML:"
+          head -30 temp_build/index.html
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -34,10 +34,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./src
+          path: ./temp_build
       
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          token: ${{ github.token }}
