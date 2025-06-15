@@ -19,10 +19,10 @@ jobs:
 
       - name: Create correct directory structure
         run: |
-                    mkdir -p deploy_root/src
+          mkdir -p deploy_root/src
           cp -r src/* deploy_root/src/
           mv deploy_root/src/index.html deploy_root/
-          
+
           # Convert all absolute paths to relative paths with src/ prefix
           # This handles _next/, favicon, manifest, icons, assets, and any other absolute paths
           sed -i 's/\(src\|href\|content\)="\(\/[^"]*\)"/\1="src\2"/g' deploy_root/index.html
