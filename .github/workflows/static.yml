@@ -17,50 +17,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Universal path fixing
+      - name: Create correct directory structure
         run: |
-          cp -r src temp_build
+          # Create the structure that matches our URLs
+          mkdir -p deploy_root/src
           
-          # Python script for comprehensive path fixing
-          cat > fix_paths.py << 'EOF'
-          import re
+          # Copy src contents to deploy_root/src/
+          cp -r src/* deploy_root/src/
           
-          def fix_html_paths(content):
-              # Add base tag if not present
-              if '<base' not in content:
-                  content = content.replace('<head>', '<head><base href="/src/">')
-              else:
-                  # Replace existing base tag
-                  content = re.sub(r'<base[^>]*>', '<base href="/src/">', content)
-              
-              # Convert ALL absolute paths (except external URLs) to relative paths
-              # This regex matches href="/something" but not href="http://something"
-              content = re.sub(r'(href|src|content)="(/(?!https?://)[^"]*)"', r'\1="\2"', content)
-              
-              # Remove leading slash from paths to make them relative
-              content = re.sub(r'(href|src|content)="(/[^h][^"]*)"', r'\1="\2"', content)
-              content = content.replace('href="/', 'href="')
-              content = content.replace('src="/', 'src="')
-              content = content.replace('content="/', 'content="')
-              
-              return content
+          # Move index.html to the root level (so it's accessible at /typingmind/)
+          mv deploy_root/src/index.html deploy_root/
           
-          # Read and fix the HTML
-          with open('temp_build/index.html', 'r', encoding='utf-8') as f:
-              html_content = f.read()
+          # Fix the base tag in index.html
+          sed -i 's|<head>|<head><base href="/typingmind/">|g' deploy_root/index.html
           
-          fixed_content = fix_html_paths(html_content)
+          # Convert absolute paths to relative paths starting with src/
+          sed -i 's|href="/_next/|href="src/_next/|g' deploy_root/index.html
+          sed -i 's|src="/_next/|src="src/_next/|g' deploy_root/index.html
+          sed -i 's|href="/favicon|href="src/favicon|g' deploy_root/index.html
+          sed -i 's|href="/manifest|href="src/manifest|g' deploy_root/index.html
+          sed -i 's|href="/android-icon|href="src/android-icon|g' deploy_root/index.html
+          sed -i 's|href="/apple-icon|href="src/apple-icon|g' deploy_root/index.html
+          sed -i 's|href="/ms-icon|href="src/ms-icon|g' deploy_root/index.html
+          sed -i 's|content="/ms-icon|content="src/ms-icon|g' deploy_root/index.html
+          sed -i 's|href="/assets/|href="src/assets/|g' deploy_root/index.html
+          sed -i 's|src="/assets/|src="src/assets/|g' deploy_root/index.html
           
-          with open('temp_build/index.html', 'w', encoding='utf-8') as f:
-              f.write(fixed_content)
+          echo "=== DIRECTORY STRUCTURE ==="
+          find deploy_root -type f | head -20
           
-          print("Fixed all paths to be relative with proper base URL")
-          EOF
-          
-          python3 fix_paths.py
-          
-          echo "=== DEBUGGING: First 30 lines of fixed HTML ==="
-          head -30 temp_build/index.html
+          echo "=== CHECKING PATHS IN HTML ==="
+          grep -o 'src="[^"]*_next[^"]*"' deploy_root/index.html | head -5
+          grep -o 'href="[^"]*_next[^"]*"' deploy_root/index.html | head -5
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -68,7 +56,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./temp_build
+          path: ./deploy_root
       
       - name: Deploy to GitHub Pages
         id: deployment
